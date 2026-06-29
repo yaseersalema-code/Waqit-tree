@@ -184,34 +184,74 @@ footer{background:#242424;border-top:1px solid #3D3D3D;padding:36px 20px;text-al
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js">
 // ===== FIREBASE =====
-var firebaseConfig = {
-  databaseURL: "https://wqit-tree-68f81-default-rtdb.firebaseio.com"
-};
-firebase.initializeApp(firebaseConfig);
-var db = firebase.database();
-var treeRef = db.ref('tree');
+var db, treeRef, decRef;
+var firebaseReady = false;
 
-// Load tree from Firebase on start
-treeRef.once('value', function(snap) {
-  var saved = snap.val();
-  if (saved) {
-    try {
-      var parsed = JSON.parse(saved);
-      // Merge saved children into TREE
-      TREE.c = parsed.c || TREE.c;
-      // Rebuild tree
-      document.getElementById('tree').querySelector('.nw') && 
-        document.getElementById('tree').removeChild(document.getElementById('tree').querySelector('.nw'));
-      document.getElementById('tree').appendChild(build(TREE, 0));
-      ALL_ENTRIES = getAllEntries(TREE,[],[]);
-    } catch(e) {}
-  }
+window.addEventListener('load', function(){
+  if(typeof firebase==='undefined') return;
+  try{
+    firebase.initializeApp({databaseURL:'https://wqit-tree-68f81-default-rtdb.firebaseio.com'});
+    db = firebase.database();
+    treeRef = db.ref('waqit_tree');
+    decRef = db.ref('waqit_deceased');
+    
+    // Load tree from Firebase on start
+    treeRef.once('value', function(snap){
+      var saved = snap.val();
+      if(saved && saved.c && saved.c.length > 0){
+        // Firebase has data - use it
+        TREE.c = saved.c;
+        var treeEl = document.getElementById('tree');
+        var old = treeEl.querySelector('.nw');
+        if(old) treeEl.removeChild(old);
+        treeEl.appendChild(build(TREE, 0));
+        ALL_ENTRIES = getAllEntries(TREE,[],[]);
+        console.log('Tree loaded from Firebase');
+      } else {
+        // Firebase empty - upload current tree
+        treeRef.set(TREE);
+        console.log('Tree uploaded to Firebase');
+      }
+      firebaseReady = true;
+    });
+    
+    // Listen for real-time changes (from other users)
+    treeRef.on('value', function(snap){
+      if(!firebaseReady) return; // Skip first load (handled by once)
+      var saved = snap.val();
+      if(saved && saved.c && saved.c.length > 0){
+        TREE.c = saved.c;
+        var treeEl = document.getElementById('tree');
+        var old = treeEl.querySelector('.nw');
+        if(old) treeEl.removeChild(old);
+        treeEl.appendChild(build(TREE, 0));
+        ALL_ENTRIES = getAllEntries(TREE,[],[]);
+      }
+    });
+    
+    // Listen for deceased changes
+    decRef.on('value', function(snap){
+      var saved = snap.val();
+      if(saved){
+        try{ DECEASED = JSON.parse(saved); updateDeceasedInTree(); }catch(e){}
+      }
+    });
+    
+  }catch(e){ console.log('Firebase error:', e); }
 });
 
-// Save tree to Firebase whenever someone adds/removes
-function saveToFirebase() {
-  treeRef.set(JSON.stringify(TREE));
+function saveToFirebase(){
+  if(typeof treeRef !== 'undefined' && treeRef){
+    treeRef.set(TREE);
+  }
 }
+
+function saveDeceasedToFirebase(){
+  if(typeof decRef !== 'undefined' && decRef){
+    decRef.set(JSON.stringify(DECEASED));
+  }
+}
+
 
 </script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -299,15 +339,15 @@ function saveToFirebase() {
     <div class="mod-msg" id="add-msg"></div>
   </div>
   <div id="panel-del" class="mod-body" style="display:none">
-    <label class="mod-label">ابحث عن الشخص</label>
+    <label class="mod-label">ابحث عن الأب</label>
     <div style="position:relative">
       <input id="del-q" class="mod-input" type="text" placeholder="ابحث عن اسم…" autocomplete="off"
-        oninput="searchDel()" onfocus="searchDel()"
+        oninput="searchDelParent()" onfocus="searchDelParent()"
         onblur="setTimeout(function(){document.getElementById('del-sug').style.display='none'},200)">
       <div id="del-sug" class="mod-sug" style="border-color:#c05050"></div>
     </div>
-    <div id="selected-del" class="mod-selected del"></div>
-    <button class="mod-btn del" onclick="confirmDelete()">حذف 🗑</button>
+    <div id="del-children-list" style="margin-top:12px"></div>
+    <button id="del-save-btn" class="mod-btn del" onclick="confirmDeleteNew()" style="display:none">حفظ الحذف</button>
     <div class="mod-msg" id="del-msg"></div>
   </div>
   <div id="panel-dec" class="mod-body" style="display:none">
@@ -1743,6 +1783,164 @@ function updateCommitteeBar(){
     adha.forEach(function(n){var c=document.createElement('div');c.className='cb-chip';c.textContent=n;names.appendChild(c);});
   }
   if(title)title.textContent='\u2b50 أعضاء العيد';
+}
+
+// ===== ADD/DELETE PERSON =====
+var selFather = null;
+
+function searchFather(){
+  var v=document.getElementById('add-father-q').value.trim();
+  var s=document.getElementById('father-sug');
+  if(!v){s.style.display='none';return;}
+  var list=[];
+  function walk2(node,path){var p=path.concat([node.n]);if(node.n)list.push({name:node.n,path:p});if(node.c)node.c.forEach(function(c){walk2(c,p);});}
+  walk2(TREE,[]);
+  var words=v.split(' ').filter(function(w){return w.length>0;});
+  var results=list.filter(function(e){
+    var f=e.path.length>1?e.path[e.path.length-2]:'';
+    var g=e.path.length>2?e.path[e.path.length-3]:'';
+    if(words.length>0&&e.name.indexOf(words[0])===-1) return false;
+    if(words.length>1&&f.indexOf(words[1])===-1) return false;
+    if(words.length>2&&g.indexOf(words[2])===-1) return false;
+    return true;
+  });
+  s.innerHTML='';
+  results.slice(0,15).forEach(function(e){
+    var f=e.path.length>1?e.path[e.path.length-2]:'';
+    var g2=e.path.length>2?e.path[e.path.length-3]:'';
+    var it=document.createElement('div');
+    it.style.cssText='padding:10px 16px;cursor:pointer;border-bottom:1px solid #333;transition:background .15s';
+    var nm=document.createElement('div');nm.style.cssText='font-size:15px;font-weight:600;color:#FAF8F5;margin-bottom:2px';nm.textContent=e.name;it.appendChild(nm);
+    var anc=e.path.slice(1,-1).reverse().slice(0,3);
+    if(anc.length){var pl=document.createElement('div');pl.style.cssText='font-size:11px;color:#BDB5AD';pl.textContent='ابن '+anc.join(' ← ');it.appendChild(pl);}
+    it.onmouseenter=function(){it.style.background='#3B4D40';};
+    it.onmouseleave=function(){it.style.background='';};
+    it.onmousedown=function(){
+      selFather=e;
+      var dn=f?e.name+' بن '+f:e.name;
+      document.getElementById('add-father-q').value=dn;
+      s.style.display='none';
+      var sd=document.getElementById('selected-father');
+      if(sd){sd.textContent='\u2713 '+dn;sd.style.display='block';}
+    };
+    s.appendChild(it);
+  });
+  s.style.display=results.length?'block':'none';
+}
+
+function saveNewPerson(){
+  var msg=document.getElementById('add-msg');
+  var nm=document.getElementById('add-new-name').value.trim();
+  if(!nm){msg.style.color='#f08080';msg.textContent='أدخل اسم الشخص';return;}
+  if(!selFather){msg.style.color='#f08080';msg.textContent='اختر الأب أولاً';return;}
+  var fNode=findN(selFather.name,TREE);
+  if(!fNode){msg.style.color='#f08080';msg.textContent='لم يوجد الأب في الشجرة';return;}
+  if(!fNode.c)fNode.c=[];
+  fNode.c.push({n:nm});
+  ALL_ENTRIES=getAllEntries(TREE,[],[]);
+  // Rebuild tree
+  var treeEl=document.getElementById('tree');
+  var old=treeEl.querySelector('.nw');if(old)treeEl.removeChild(old);
+  treeEl.appendChild(build(TREE,0));
+  if(typeof saveToFirebase!=='undefined')saveToFirebase();
+  msg.style.color='#4ade80';msg.textContent='\u2713 تم إضافة '+nm;
+  selFather=null;
+  document.getElementById('add-father-q').value='';
+  document.getElementById('add-new-name').value='';
+  var sd=document.getElementById('selected-father');if(sd)sd.style.display='none';
+  setTimeout(function(){msg.textContent='';closeAddModal();},2000);
+}
+
+function findN(name,node){
+  if(node.n===name)return node;
+  if(node.c)for(var i=0;i<node.c.length;i++){var r=findN(name,node.c[i]);if(r)return r;}
+  return null;
+}
+
+function removeN(name,node){
+  if(node.c){for(var i=0;i<node.c.length;i++){if(node.c[i].n===name){node.c.splice(i,1);return true;}if(removeN(name,node.c[i]))return true;}}
+  return false;
+}
+
+var selDel2=null;
+function searchDelParent(){
+  var v=document.getElementById('del-q').value.trim();
+  var s=document.getElementById('del-sug');
+  if(!v){s.style.display='none';return;}
+  var list=[];
+  function walkD(node,path){var p=path.concat([node.n]);if(node.n&&node.c&&node.c.length)list.push({name:node.n,path:p});if(node.c)node.c.forEach(function(c){walkD(c,p);});}
+  walkD(TREE,[]);
+  var words=v.split(' ').filter(function(w){return w.length>0;});
+  var results=list.filter(function(e){
+    var f=e.path.length>1?e.path[e.path.length-2]:'';
+    if(words.length>0&&e.name.indexOf(words[0])===-1) return false;
+    if(words.length>1&&f.indexOf(words[1])===-1) return false;
+    return true;
+  });
+  s.innerHTML='';
+  results.slice(0,15).forEach(function(e){
+    var it=document.createElement('div');
+    it.style.cssText='padding:10px 16px;cursor:pointer;border-bottom:1px solid #333;transition:background .15s';
+    var nm=document.createElement('div');nm.style.cssText='font-size:15px;font-weight:600;color:#FAF8F5;margin-bottom:2px';nm.textContent=e.name;it.appendChild(nm);
+    var anc=e.path.slice(1,-1).reverse().slice(0,2);
+    if(anc.length){var pl=document.createElement('div');pl.style.cssText='font-size:11px;color:#BDB5AD';pl.textContent='ابن '+anc.join(' ← ');it.appendChild(pl);}
+    it.onmouseenter=function(){it.style.background='#c05050';};
+    it.onmouseleave=function(){it.style.background='';};
+    it.onmousedown=function(){
+      selDel2=e;
+      document.getElementById('del-q').value=e.name;
+      s.style.display='none';
+      renderDelChildren(e.name);
+    };
+    s.appendChild(it);
+  });
+  s.style.display=results.length?'block':'none';
+}
+
+var delPendingList=[];
+function renderDelChildren(parentName){
+  var node=findN(parentName,TREE);
+  var list=document.getElementById('del-children-list');
+  if(!list)return;
+  list.innerHTML='';
+  delPendingList=[];
+  if(!node||!node.c||!node.c.length){list.innerHTML='<div style="color:#888;font-size:13px;text-align:center;padding:10px">لا يوجد أبناء</div>';return;}
+  node.c.forEach(function(child){
+    var row=document.createElement('div');
+    row.id='del-row-'+encodeURIComponent(child.n);
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:#2E2E2E;border-radius:10px;border:1px solid #444;margin-bottom:6px;transition:all .2s';
+    var nm=document.createElement('span');nm.style.cssText='font-family:Scheherazade New,serif;font-size:15px;color:#E0E0E0';nm.textContent=child.n;
+    var btn=document.createElement('button');btn.style.cssText='background:#8b2020;border:none;color:#fff;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px';
+    btn.textContent='\u2715';
+    btn.onclick=(function(cname){
+      return function(){
+        var row2=document.getElementById('del-row-'+encodeURIComponent(cname));
+        if(delPendingList.indexOf(cname)===-1){delPendingList.push(cname);if(row2){row2.style.opacity='0.4';row2.style.borderColor='#c05050';}}
+        else{delPendingList.splice(delPendingList.indexOf(cname),1);if(row2){row2.style.opacity='1';row2.style.borderColor='#444';}}
+        document.getElementById('del-save-btn').style.display=delPendingList.length?'block':'none';
+      };
+    })(child.n);
+    row.appendChild(nm);row.appendChild(btn);list.appendChild(row);
+  });
+}
+
+function confirmDeleteNew(){
+  var msg=document.getElementById('del-msg');
+  if(!delPendingList.length)return;
+  delPendingList.forEach(function(nm){
+    removeN(nm,TREE);
+    ALL_ENTRIES=getAllEntries(TREE,[],[]);
+  });
+  var treeEl=document.getElementById('tree');
+  var old=treeEl.querySelector('.nw');if(old)treeEl.removeChild(old);
+  treeEl.appendChild(build(TREE,0));
+  if(typeof saveToFirebase!=='undefined')saveToFirebase();
+  msg.style.color='#4ade80';msg.textContent='\u2713 تم حذف '+delPendingList.join(', ');
+  delPendingList=[];
+  document.getElementById('del-children-list').innerHTML='';
+  document.getElementById('del-save-btn').style.display='none';
+  document.getElementById('del-q').value='';
+  setTimeout(function(){msg.textContent='';closeAddModal();},2000);
 }
 </script>
 </body>
