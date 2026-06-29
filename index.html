@@ -1985,9 +1985,11 @@ function toggleNasab(){
   var m=document.getElementById('nasab-modal');
   var o=document.getElementById('nasab-overlay');
   if(!m)return;
-  var open=m.style.display==='block'||m.style.display==='';
-  m.style.display=open?'none':'block';
-  if(o)o.style.display=open?'none':'block';
+  var isOpen=m.style.display==='flex';
+  m.style.display=isOpen?'none':'flex';
+  if(o)o.style.display=isOpen?'none':'block';
+  document.body.style.overflow=isOpen?'':'hidden';
+  if(!isOpen&&typeof buildNasabChain!=='undefined')buildNasabChain();
 }
 </script>
 </body>
