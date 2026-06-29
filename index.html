@@ -184,8 +184,8 @@ footer{background:#242424;border-top:1px solid #3D3D3D;padding:36px 20px;text-al
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js">
 // ===== FIREBASE =====
-var db, treeRef, decRef;
-var firebaseReady = false;
+var db, treeRef, decRef, eidRef, usersRef;
+var firebaseLoaded = false;
 
 window.addEventListener('load', function(){
   if(typeof firebase==='undefined') return;
@@ -194,63 +194,94 @@ window.addEventListener('load', function(){
     db = firebase.database();
     treeRef = db.ref('waqit_tree');
     decRef = db.ref('waqit_deceased');
-    
-    // Load tree from Firebase on start
+    eidRef = db.ref('waqit_eid');
+    usersRef = db.ref('waqit_users');
+
+    // 1. Load tree
     treeRef.once('value', function(snap){
       var saved = snap.val();
       if(saved && saved.c && saved.c.length > 0){
-        // Firebase has data - use it
         TREE.c = saved.c;
-        var treeEl = document.getElementById('tree');
-        var old = treeEl.querySelector('.nw');
-        if(old) treeEl.removeChild(old);
-        treeEl.appendChild(build(TREE, 0));
-        ALL_ENTRIES = getAllEntries(TREE,[],[]);
-        console.log('Tree loaded from Firebase');
+        rebuildTree();
       } else {
-        // Firebase empty - upload current tree
         treeRef.set(TREE);
-        console.log('Tree uploaded to Firebase');
       }
-      firebaseReady = true;
+      firebaseLoaded = true;
+
+      // Load users
+      usersRef.once('value', function(snap){
+        var d = snap.val();
+        if(d && Object.keys(d).length > 0){
+          USERS = d;
+        } else {
+          // First time - upload current users
+          usersRef.set(USERS);
+        }
+      });
+
+      // 2. Listen for real-time tree changes
+      treeRef.on('value', function(snap2){
+        if(!firebaseLoaded) return;
+        var d = snap2.val();
+        if(d && d.c && d.c.length > 0){
+          TREE.c = d.c;
+          rebuildTree();
+        }
+      });
     });
-    
-    // Listen for real-time changes (from other users)
-    treeRef.on('value', function(snap){
-      if(!firebaseReady) return; // Skip first load (handled by once)
-      var saved = snap.val();
-      if(saved && saved.c && saved.c.length > 0){
-        TREE.c = saved.c;
-        var treeEl = document.getElementById('tree');
-        var old = treeEl.querySelector('.nw');
-        if(old) treeEl.removeChild(old);
-        treeEl.appendChild(build(TREE, 0));
-        ALL_ENTRIES = getAllEntries(TREE,[],[]);
-      }
-    });
-    
-    // Listen for deceased changes
+
+    // 3. Load deceased
     decRef.on('value', function(snap){
-      var saved = snap.val();
-      if(saved){
-        try{ DECEASED = JSON.parse(saved); updateDeceasedInTree(); }catch(e){}
+      var d = snap.val();
+      if(d && typeof d === 'object'){
+        DECEASED = d;
+        if(typeof updateDeceasedInTree !== 'undefined') updateDeceasedInTree();
       }
     });
-    
+
+    // 4. Load EID data
+    eidRef.on('value', function(snap){
+      var d = snap.val();
+      if(d){
+        if(d.fitr) EID_DATA.fitr = d.fitr;
+        if(d.adha) EID_DATA.adha = d.adha;
+        if(typeof renderEidMembers !== 'undefined' && document.getElementById('eid-modal') && document.getElementById('eid-modal').style.display !== 'none'){
+          renderCommittee();
+          renderEidMembers();
+          updateEidDateDisplay();
+          updateCommitteeBar();
+        }
+        updateCommitteeBar();
+      }
+    });
+
   }catch(e){ console.log('Firebase error:', e); }
 });
 
+function rebuildTree(){
+  ALL_ENTRIES = getAllEntries(TREE,[],[]);
+  var treeEl = document.getElementById('tree');
+  var old = treeEl.querySelector('.nw');
+  if(old) treeEl.removeChild(old);
+  treeEl.appendChild(build(TREE, 0));
+}
+
 function saveToFirebase(){
-  if(typeof treeRef !== 'undefined' && treeRef){
-    treeRef.set(TREE);
-  }
+  if(typeof treeRef !== 'undefined' && treeRef) treeRef.set(TREE);
+}
+
+function saveUsersToFirebase(){
+  if(typeof usersRef !== 'undefined' && usersRef) usersRef.set(USERS);
 }
 
 function saveDeceasedToFirebase(){
-  if(typeof decRef !== 'undefined' && decRef){
-    decRef.set(JSON.stringify(DECEASED));
-  }
+  if(typeof decRef !== 'undefined' && decRef) decRef.set(DECEASED);
 }
+
+function saveEidToFirebase(){
+  if(typeof eidRef !== 'undefined' && eidRef) eidRef.set(EID_DATA);
+}
+
 
 
 </script>
@@ -1051,6 +1082,7 @@ function saveMemberPass(){
   var msg=document.getElementById('member-pass-msg');
   if(!pass||pass.length<3){msg.style.color='#f08080';msg.textContent='\u0627\u0644\u0631\u0642\u0645 \u0642\u0635\u064a\u0631';return;}
   USERS[currentUser].pass=pass;
+  if(typeof saveUsersToFirebase!=='undefined')saveUsersToFirebase();
   msg.style.color='#4ade80';msg.textContent='\u2713 \u062a\u0645 \u062a\u063a\u064a\u064a\u0631 \u0627\u0644\u0631\u0642\u0645';
   setTimeout(function(){closeMemberPass();},1500);
 }
@@ -1073,6 +1105,7 @@ function changeUserPass(){
   var msg=document.getElementById('cp-msg');
   if(!user||!pass){msg.style.color='#f08080';msg.textContent='\u0627\u0643\u0645\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a';return;}
   USERS[user].pass=pass;
+  if(typeof saveUsersToFirebase!=='undefined')saveUsersToFirebase();
   document.getElementById('cp-new').value='';
   msg.style.color='#4ade80';msg.textContent='\u2713 \u062a\u0645 \u062a\u063a\u064a\u064a\u0631 \u0631\u0642\u0645 '+user;
   setTimeout(function(){msg.textContent='';},2000);
@@ -1153,6 +1186,7 @@ function searchEidMember(){
       EID_DATA[currentEid].members.push({name:fullName,type:'monthly',paid:[],totalPaid:0,isAdmin:false});
       renderEidMembers();
       updateEidStats();
+      if(typeof saveEidToFirebase!=='undefined')saveEidToFirebase();
     };
     s.appendChild(it);
   });
@@ -1354,6 +1388,7 @@ function confirmPayment(name, amount) {
   document.getElementById('pay-msg-input').value = '';
   document.getElementById('pay-parse-result').style.display = 'none';
   renderIncomeList();
+  if(typeof saveEidToFirebase!=='undefined')saveEidToFirebase();
   alert('\u2713 \u062a\u0645 \u062a\u0633\u062c\u064a\u0644 \u062f\u0641\u0639\u0629 ' + name + ' - ' + amount + ' \u0631\u064a\u0627\u0644');
 }
 
@@ -1367,6 +1402,7 @@ function addExpense() {
   document.getElementById('exp-desc').value = '';
   document.getElementById('exp-amount').value = '';
   renderExpenseList();
+  if(typeof saveEidToFirebase!=='undefined')saveEidToFirebase();
 }
 
 function renderIncomeList() {
@@ -1562,6 +1598,7 @@ function addNewUser(){
   if(msg){msg.style.color='#4ade80';msg.textContent='\u2713 تم إضافة '+name;}
   renderMgmtUsers();
   if(typeof populateCpUsers!=='undefined')populateCpUsers();
+  if(typeof saveUsersToFirebase!=='undefined')saveUsersToFirebase();
   setTimeout(function(){if(msg)msg.textContent='';},2000);
 }
 
@@ -1710,6 +1747,7 @@ function addCommitteeMember(){
   EID_DATA[currentEid].adminMembers.push(name);
   inp.value='';
   renderCommittee();
+  if(typeof saveEidToFirebase!=='undefined')saveEidToFirebase();
   updateCommitteeBar();
 }
 
@@ -1941,6 +1979,15 @@ function confirmDeleteNew(){
   document.getElementById('del-save-btn').style.display='none';
   document.getElementById('del-q').value='';
   setTimeout(function(){msg.textContent='';closeAddModal();},2000);
+}
+
+function toggleNasab(){
+  var m=document.getElementById('nasab-modal');
+  var o=document.getElementById('nasab-overlay');
+  if(!m)return;
+  var open=m.style.display==='block'||m.style.display==='';
+  m.style.display=open?'none':'block';
+  if(o)o.style.display=open?'none':'block';
 }
 </script>
 </body>
