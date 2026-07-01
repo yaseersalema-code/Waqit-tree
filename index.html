@@ -229,7 +229,8 @@ window.addEventListener('load', function(){
         TREE.c = saved.c;
         rebuildTreeDOM();
       } else {
-        treeRef.set(TREE);
+        console.log('Firebase empty - uploading tree...');
+        treeRef.set(TREE).then(function(){ console.log('Tree uploaded OK!'); }).catch(function(e){ console.log('Upload failed:', e); });
       }
       firebaseReady = true;
 
