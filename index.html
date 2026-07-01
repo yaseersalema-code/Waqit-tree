@@ -209,7 +209,7 @@ var db, treeRef, usersRef;
 var firebaseReady = false;
 var APP_SECRET = 'ZHKhOBDZ0JLAPxT2pzNLoCGzoQRQiOH8';
 
-window.addEventListener('load', function(){
+window.addEventListener('DOMContentLoaded', function(){
   try{
     firebase.initializeApp({databaseURL:'https://wqit-tree-68f81-default-rtdb.firebaseio.com'});
     db = firebase.database();
