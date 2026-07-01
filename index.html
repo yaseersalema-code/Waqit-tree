@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=10.0, user-scalable=yes">
 <title>شجرة ذوي وقيت</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="theme-color" content="#1E1E1E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -225,21 +225,19 @@ window.addEventListener('load', function(){
     // Load tree once on start
     treeRef.once('value', function(snap){
       var saved = snap.val();
-      var savedTree = saved && saved.data ? saved.data : null;
-      if(savedTree && savedTree.c && savedTree.c.length > 0){
-        TREE.c = savedTree.c;
+      if(saved && saved.c && saved.c.length > 0){
+        TREE.c = saved.c;
         rebuildTreeDOM();
       } else {
-        treeRef.set({_secret:APP_SECRET, data:TREE});
+        treeRef.set(TREE);
       }
       firebaseReady = true;
 
       // Real-time listener - no firebaseReady check so updates always come through
       treeRef.on('value', function(snap2){
         var d = snap2.val();
-        var dTree = d && d.data ? d.data : null;
-        if(dTree && dTree.c && dTree.c.length > 0){
-          TREE.c = dTree.c;
+        if(d && d.c && d.c.length > 0){
+          TREE.c = d.c;
           rebuildTreeDOM();
           updateDeceasedInTree();
         }
@@ -278,7 +276,7 @@ function rebuildTreeDOM(){
 }
 
 function saveToFirebase(){
-  if(typeof treeRef !== 'undefined' && treeRef) treeRef.set({_secret:APP_SECRET, data:TREE});
+  if(typeof treeRef !== 'undefined' && treeRef) treeRef.set(TREE);
 }
 
 function saveUsersToFirebase(){
