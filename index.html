@@ -153,7 +153,6 @@ footer{background:#242424;border-top:1px solid #3D3D3D;padding:36px 20px;text-al
 }
 
 .auth-badge{position:fixed;top:12px;left:12px;z-index:1000;width:34px;height:34px;border-radius:50%;background:#3B3B3B;border:2px solid #555;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:#FAF8F5;font-weight:700;font-family:'Scheherazade New',serif}
-#logout-btn{display:none;position:fixed;top:12px;left:56px;z-index:1000;background:#3a1a1a;border:1px solid #c05050;color:#f08080;padding:6px 14px;border-radius:12px;font-family:'Scheherazade New',serif;font-size:13px;cursor:pointer;font-weight:600}
 #login-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;backdrop-filter:blur(6px)}
 #login-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3001;width:88%;max-width:360px;background:#242424;border-radius:20px;border:1px solid #3D3D3D;padding:28px 24px;box-sizing:border-box}
 .login-title{font-size:20px;color:#C5A880;font-weight:700;font-family:'Scheherazade New',serif;text-align:center;margin-bottom:20px}
@@ -170,7 +169,6 @@ footer{background:#242424;border-top:1px solid #3D3D3D;padding:36px 20px;text-al
 .cmp-sug{position:absolute;top:100%;right:0;left:0;background:#2A2A2A;border:1px solid #3B4D40;border-top:none;border-radius:0 0 12px 12px;max-height:180px;overflow-y:auto;z-index:10;display:none}
 
 .auth-badge{position:fixed;top:12px;left:12px;z-index:1000;width:34px;height:34px;border-radius:50%;background:#3B3B3B;border:2px solid #555;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:#FAF8F5;font-weight:700;font-family:'Scheherazade New',serif}
-#logout-btn{display:none;position:fixed;top:12px;left:56px;z-index:1000;background:#3a1a1a;border:1px solid #c05050;color:#f08080;padding:6px 14px;border-radius:12px;font-family:'Scheherazade New',serif;font-size:13px;cursor:pointer;font-weight:600}
 #login-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:3000;backdrop-filter:blur(6px)}
 #login-modal{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3001;width:88%;max-width:360px;background:#242424;border-radius:20px;border:1px solid #3D3D3D;padding:28px 24px;box-sizing:border-box}
 .login-title{font-size:20px;color:#C5A880;font-weight:700;font-family:'Scheherazade New',serif;text-align:center;margin-bottom:20px}
@@ -304,6 +302,7 @@ function saveUsersToFirebase(){
   <div class="tb-btns">
     
     
+    <button id="logout-btn" onclick="doLogout()" style="display:none;background:#3a1a1a;border:1px solid #c05050;color:#f08080;padding:6px 14px;border-radius:12px;font-family:'Scheherazade New',serif;font-size:13px;cursor:pointer;font-weight:600">خروج</button>
     <button class="tb-btn tb-add" onclick="toggleAddModal()">＋ إضافة / حذف</button>
     
     <button class="tb-btn" onclick="openCompareModal()">مقارنة</button>
@@ -321,7 +320,7 @@ function saveUsersToFirebase(){
 <div class="zoom-controls">
   <button class="zoom-btn" onclick="zoomIn()" title="تكبير">+</button>
   <button class="zoom-btn" onclick="zoomOut()" title="تصغير">−</button>
-  <button class="zoom-btn" onclick="collapseAll();zoomReset();" title="إعادة ضبط" style="font-size:14px">رجع</button>
+  <button class="zoom-btn" onclick="collapseAll();zoomReset();window.scrollTo(0,0);" title="إعادة ضبط" style="font-size:14px">رجع</button>
 </div>
 <div id="path-box">
   <div class="path-label">مسار النسب</div>
@@ -455,13 +454,11 @@ function saveUsersToFirebase(){
 </div>
 <button id="install-btn" onclick="openInstallModal()">ثبّت التطبيق 📲</button>
 <div class="auth-badge" id="auth-badge" onclick="toggleLogin()">?</div>
-<button id="logout-btn" onclick="doLogout()">خروج</button>
 <div id="login-overlay" onclick="closeLogin()"></div>
 <div id="login-modal">
   <div class="login-title">دخول</div>
   <input id="login-user" class="login-input" type="text" placeholder="اسم المستخدم" autocomplete="off">
   <input id="login-pass" class="login-input" type="password" placeholder="الرقم السري">
-  <input id="new-pass" class="login-input" type="password" placeholder="رقم جديد (اختياري)">
   <button class="login-btn" onclick="doLogin()">دخول</button>
   <div class="login-err" id="login-err"></div>
 </div>
@@ -555,7 +552,7 @@ function saveUsersToFirebase(){
   </div>
   <button onclick="closeInstallModal()" style="width:100%;padding:11px;border:1px solid #444;border-radius:12px;background:transparent;color:#888;font-family:'Scheherazade New',serif;font-size:14px;cursor:pointer;margin-top:8px">إغلاق</button>
 </div>
-<div class="watermark">صنع بحب من ياسر سالم الرحيمي © 2026</div>
+<div class="watermark">جمع وإعداد وتدقيق: عبدالرحمن ضيف الله الرحيمي<br>صنع بحب من ياسر سالم الرحيمي © 2026</div>
 
 <script>
 const TREE = {n:"\u0648\u0642\u064a\u062a",c:[
@@ -739,9 +736,9 @@ function expandAll() {
   document.querySelectorAll('.vln').forEach(function(v){v.style.display='';});
 }
 function collapseAll() {
-  document.querySelectorAll('.np').forEach(function(p){if(!p.closest('.lv0')&&!p.closest('.lv1'))p.classList.remove('active');});
-  document.querySelectorAll('.nkids').forEach(function(k){if(!k.closest('.lv0')&&!k.closest('.lv1'))k.classList.remove('open');});
-  document.querySelectorAll('.vln').forEach(function(v){if(!v.closest('.lv0')&&!v.closest('.lv1'))v.style.display='none';});
+  document.querySelectorAll('.np').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nkids').forEach(function(k){ k.classList.remove('open'); k.style.display='none'; });
+  document.querySelectorAll('.vln').forEach(function(v){ v.style.display='none'; });
 }
 
 function getAllEntries(node, path, list) {
@@ -1056,7 +1053,7 @@ function closeLogin(){
 function doLogin(){
   var user=document.getElementById('login-user').value.trim();
   var pass=document.getElementById('login-pass').value.trim();
-  var newPass=document.getElementById('new-pass')?document.getElementById('new-pass').value.trim():'';
+  var newPass='';
   var err=document.getElementById('login-err');
   if(!USERS[user]){err.textContent='\u0627\u0633\u0645 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f';return;}
   if(USERS[user].pass!==pass){err.textContent='\u0627\u0644\u0631\u0642\u0645 \u062e\u0627\u0637\u0626';return;}
