@@ -234,14 +234,14 @@ window.addEventListener('load', function(){
       }
       firebaseReady = true;
 
-      // Real-time listener for changes from other users
+      // Real-time listener - no firebaseReady check so updates always come through
       treeRef.on('value', function(snap2){
-        if(!firebaseReady) return;
         var d = snap2.val();
         var dTree = d && d.data ? d.data : null;
         if(dTree && dTree.c && dTree.c.length > 0){
           TREE.c = dTree.c;
           rebuildTreeDOM();
+          updateDeceasedInTree();
         }
       });
     });
@@ -260,7 +260,16 @@ window.addEventListener('load', function(){
   }catch(e){ console.log('Firebase error:', e); }
 });
 
+function fixArrays(node){
+  if(!node) return node;
+  if(node.c && !Array.isArray(node.c)){
+    node.c = Object.keys(node.c).sort().map(function(k){return node.c[k];});
+  }
+  if(node.c) node.c.forEach(function(ch){fixArrays(ch);});
+  return node;
+}
 function rebuildTreeDOM(){
+  fixArrays(TREE);
   ALL_ENTRIES = getAllEntries(TREE,[],[]);
   var treeEl = document.getElementById('tree');
   var old = treeEl.querySelector('.nw');
